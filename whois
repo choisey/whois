@@ -1,0 +1,74 @@
+#!/bin/bash
+
+if [[ $# -lt 1 ]]; then
+    echo "Usage: $0 [domain-name]" 1>&2
+    exit
+fi
+
+domain="$1"
+dir=$(dirname $0)
+cache_dir="$dir/whois-cache"
+
+# [1] is the domain name is valid?
+if [[ "$(echo "$domain" | grep -e '^[a-z0-9]\([a-z0-9\-]*[a-z0-9]\)\?\.\(com\|net\|org\|info\|biz\|co\.kr\|kr\)$')" != "$domain" ]]; then
+    echo "ERROR: $domain domain not supported" 1>&2
+    exit
+fi
+
+if [[ ! -d $cache_dir ]]; then
+    mkdir -p "$cache_dir"
+fi
+
+# [2] whois lookup
+if [[ ! -f "$cache_dir/$domain" ]]; then
+    # rate limit
+    case $domain in
+    *.kr)
+        if [[ "$(find "$cache_dir/" -name *.kr -ctime -1 | wc -l)" -gt 100 ]]; then
+            echo "$domain too many .KR lookup!" 1>&2
+            exit
+        fi
+        ;;
+    *.org)
+        if [[ "$(find "$cache_dir/" -name *.org -ctime -1 | wc -l)" -gt 100 ]]; then
+            echo "$domain too many .ORG lookup!" 1>&2
+            exit
+        fi
+        ;;
+    *.info)
+        if [[ "$(find "$cache_dir/" -name *.org -ctime -1 | wc -l)" -gt 100 ]]; then
+            echo "$domain too many .INFO lookup!" 1>&2
+            exit
+        fi
+        ;;
+    esac
+
+    case $domain in
+    *.com|*.net)
+        whois --no-recursion $1 > "$cache_dir/$domain"
+        ;;
+    *)
+        whois $1 > "$cache_dir/$domain"
+        ;;
+    esac
+fi
+
+# [3] show the creation date from cache
+reg=""
+case $domain in
+*.com|*.net|*.org|*.info|*.biz)
+    reg="$(cat "$cache_dir/$domain" | grep 'Creation Date:' | sed 's/^Creation\ Date:\ //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+")"
+    ;;
+*.kr)
+    reg="$(cat "$cache_dir/$domain" | grep 'Registered Date' | sed  "s/^.\+\([0-9]\{4\}\)\.\ \([0-9]\{2\}\)\.\ \([0-9]\{2\}\)\./\1-\2-\3/")"
+    ;;
+*)
+    reg="$(cat "$cache_dir/$domain")"
+    ;;
+esac
+
+if [[ -n "$reg" ]]; then
+    echo -e "$domain\t$reg"
+else
+    echo -e "$domain\t*** available ***"
+fi
