@@ -59,10 +59,10 @@ for domain in ${domains[@]}; do
         # lookup
         case $domain in
         *.com|*.net)
-            whois --no-recursion $1 > "$cache_dir/$domain"
+            whois --no-recursion $domain > "$cache_dir/$domain"
             ;;
         *)
-            whois $1 > "$cache_dir/$domain"
+            whois $domain > "$cache_dir/$domain"
             ;;
         esac
     fi
