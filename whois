@@ -70,8 +70,11 @@ for domain in ${domains[@]}; do
     # [3] show the creation date from cache
     reg=""
     case $domain in
-    *.com|*.net|*.org|*.info|*.biz|*.us)
+    *.com|*.net)
         reg="$(cat "$cache_dir/$domain" | grep 'Creation Date:' | sed 's/^Creation\ Date:\ //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+")"
+        ;;
+    *.org|*.info|*.biz|*.us)
+        reg="$(cat "$cache_dir/$domain" | grep 'Creation Date:' | sed 's/^Creation\ Date:\ //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+" | head -1)"
         ;;
     *.uk)
         reg="$(cat "$cache_dir/$domain" | grep 'Registered on:' | sed -e "s/^.\+\ before Aug-1996$/before 08-1996/" \
