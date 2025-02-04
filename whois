@@ -90,10 +90,33 @@ for domain in ${domains[@]}; do
         ;;
     esac
 
+    extlen=$(echo "$domain" | grep -o '\..\+$' | wc -c)
+    spaces=""
+    case $extlen in
+    3)
+        spaces="     "
+        ;;
+    4)
+        spaces="    "
+        ;;
+    5)
+        spaces="   "
+        ;;
+    6)
+        spaces="  "
+        ;;
+    7)
+        spaces=" "
+        ;;
+    *)
+        spaces=""
+        ;;
+    esac
+
     if [[ -n "$reg" ]]; then
-        echo -e "$domain\t$reg"
+        echo "$domain$spaces $reg"
     else
-        echo -e "$domain\t*** available ***"
+        echo "$domain$spaces *** available ***"
     fi
 
 done
