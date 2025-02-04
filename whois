@@ -5,11 +5,13 @@ if [[ $# -lt 1 ]]; then
     exit
 fi
 
+nocache=0
+
 domains=()
 for d in $@; do
     case $d in
-    "-f")
-        echo "don't use cache and force a lookup - not implemented yet." 1>&2
+    "--no-cache")
+        nocache=1
         ;;
     *)
         domains+=($d)
@@ -33,7 +35,7 @@ for domain in ${domains[@]}; do
     fi
 
     # [2] whois lookup
-    if [[ ! -f "$cache_dir/$domain" ]]; then
+    if [[ "$nocache" -ne 0 ]] || [[ ! -f "$cache_dir/$domain" ]]; then
         # rate limit
         case $domain in
         *.kr)
