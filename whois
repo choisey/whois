@@ -1,12 +1,17 @@
 #!/bin/bash
 
 if [[ $# -lt 1 ]]; then
-    echo "Usage: $0 [domain-name]" 1>&2
+    echo "Usage: $0 [options]? [domain-name]" 1>&2
+    echo "Options:" 1>&2
+    echo -e "\t--no-cache (-n)  Enforce a lookup bypassing cached data" 1>&2
+    echo -e "\t--recursion (-r) Recursive query to registrar's whois server (.com and .net)" 1>&2
+    echo -e "\t--view (-v)      View the lookup result" 1>&2
     exit
 fi
 
 nocache=0
-#recursion=0
+recursion=0
+view=0
 
 domains=()
 for d in $@; do
@@ -14,9 +19,12 @@ for d in $@; do
     "--no-cache"|"-n")
         nocache=1
         ;;
-#    "--recursion"|"-r")
-#        recursion=1
-#        ;;
+    "--recursion"|"-r")
+        recursion=1
+        ;;
+    "--view"|"-v")
+        view=1
+        ;;
     *)
         domains+=($d)
         ;;
@@ -43,7 +51,7 @@ for domain in ${domains[@]}; do
         # rate limit
         case $domain in
         *.kr)
-            if [[ "$(find "$cache_dir/" -name *.kr -ctime -1 | wc -l)" -gt 100 ]]; then
+            if [[ "$(find "$cache_dir/" -name *.kr -ctime -1 | wc -l)" -gt 200 ]]; then
                 echo "** $domain too many .KR lookup!" 1>&2
                 continue
             fi
@@ -74,68 +82,87 @@ for domain in ${domains[@]}; do
     fi
 
     # recursion
-#    if [[ "$recursion" -ne 0 ]] && [[ -n "$(echo "$domain" | grep -o '\.\(com\|net\)$')" ]] && [[ "$nocache" -eq 0 ]]; then
-#        rwhois="$(cat "$cache_dir/$domain" | grep "Registrar WHOIS Server:" | grep -o "[a-z0-9][a-z0-9\-\.]\+[a-z]$")"
-#        rcache_dir="$cache_dir/registrar-$rwhois-cache"
-#        rcache="$rcache_dir/$domain"
-#        if [[ ! -f "$rcache" ]]; then
-#            if [[ ! -d "$rcache_dir" ]]; then
-#                mkdir -p "$rcache_dir"
-#            fi
-#            whois --host "$rwhois" "$domain" > "$rcache"
-#        fi
-#    fi
+    # must be either .com or .net
+    if [[ "$recursion" -ne 0 ]] && [[ -n "$(echo "$domain" | grep -o '\.\(com\|net\)$')" ]]; then
+        rwhois="$(cat "$cache_dir/$domain" | grep "Registrar WHOIS Server:" | grep -o "[a-z0-9][a-z0-9\-\.]\+[a-z]$")"
+        rcache_dir="$cache_dir/registrar-$rwhois-cache"
+        rcache="$rcache_dir/$domain"
+        if [[ "$nocache" -ne 0 ]] || [[ ! -f "$rcache" ]]; then
+            if [[ ! -d "$rcache_dir" ]]; then
+                mkdir -p "$rcache_dir"
+            fi
+            whois --host "$rwhois" "$domain" > "$rcache"
+        fi
+    fi
 
-    # [3] show the creation date from cache
-    reg=""
-    case $domain in
-    *.com|*.net)
-        reg="$(cat "$cache_dir/$domain" | grep 'Creation Date:' | sed 's/^Creation\ Date:\ //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+")"
-        ;;
-    *.org|*.info|*.biz|*.us)
-        reg="$(cat "$cache_dir/$domain" | grep 'Creation Date:' | sed 's/^Creation\ Date:\ //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+" | head -1)"
-        ;;
-    *.uk)
-        reg="$(cat "$cache_dir/$domain" | grep 'Registered on:' | sed -e "s/^.\+\ before Aug-1996$/before 08-1996/" \
-            -e "s/^.\+\([0-9]\{2\}\)-\([A-Z][a-z]\{2\}\)-\([0-9]\{4\}\)/\3-\2-\1/" \
-            -e "s/\-Jan\-/\-01\-/" -e "s/\-Feb\-/\-02\-/" -e "s/\-Mar\-/\-03\-/" -e "s/\-Apr\-/\-04\-/" -e "s/\-May\-/\-05\-/" -e "s/\-Jun\-/\-06\-/" \
-            -e "s/\-Jul\-/\-07\-/" -e "s/\-Aug\-/\-08\-/" -e "s/\-Sep\-/\-09\-/" -e "s/\-Oct\-/\-10\-/" -e "s/\-Nov\-/\-11\-/" -e "s/\-Dec\-/\-12\-/")"
-        ;;
-    *.kr)
-        reg="$(cat "$cache_dir/$domain" | grep 'Registered Date' | sed "s/^.\+\([0-9]\{4\}\)\.\ \([0-9]\{2\}\)\.\ \([0-9]\{2\}\)\./\1-\2-\3/")"
-        ;;
-    *)
-        reg="$(cat "$cache_dir/$domain")"
-        ;;
-    esac
+    # [3] show from cache
+    if [[ "$view" -eq 0 ]]; then
+        # show only the creation date
+        reg=""
+        case $domain in
+        *.com|*.net)
+            reg="$(cat "$cache_dir/$domain" | grep 'Creation Date:' | sed 's/^Creation\ Date:\ //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+")"
+            ;;
+        *.org|*.info|*.biz|*.us)
+            reg="$(cat "$cache_dir/$domain" | grep 'Creation Date:' | sed 's/^Creation\ Date:\ //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+" | head -1)"
+            ;;
+        *.uk)
+            reg="$(cat "$cache_dir/$domain" | grep 'Registered on:' | sed -e "s/^.\+\ before Aug-1996$/before 08-1996/" \
+                -e "s/^.\+\([0-9]\{2\}\)-\([A-Z][a-z]\{2\}\)-\([0-9]\{4\}\)/\3-\2-\1/" \
+                -e "s/\-Jan\-/\-01\-/" -e "s/\-Feb\-/\-02\-/" -e "s/\-Mar\-/\-03\-/" -e "s/\-Apr\-/\-04\-/" -e "s/\-May\-/\-05\-/" -e "s/\-Jun\-/\-06\-/" \
+                -e "s/\-Jul\-/\-07\-/" -e "s/\-Aug\-/\-08\-/" -e "s/\-Sep\-/\-09\-/" -e "s/\-Oct\-/\-10\-/" -e "s/\-Nov\-/\-11\-/" -e "s/\-Dec\-/\-12\-/")"
+            ;;
+        *.kr)
+            reg="$(cat "$cache_dir/$domain" | grep 'Registered Date' | sed "s/^.\+\([0-9]\{4\}\)\.\ \([0-9]\{2\}\)\.\ \([0-9]\{2\}\)\./\1-\2-\3/")"
+            ;;
+        *)
+            reg="$(cat "$cache_dir/$domain")"
+            ;;
+        esac
 
-    extlen=$(echo "$domain" | grep -o '\..\+$' | wc -c)
-    spaces=""
-    case $extlen in
-    3)
-        spaces="     "
-        ;;
-    4)
-        spaces="    "
-        ;;
-    5)
-        spaces="   "
-        ;;
-    6)
-        spaces="  "
-        ;;
-    7)
-        spaces=" "
-        ;;
-    *)
+        extlen=$(echo "$domain" | grep -o '\..\+$' | wc -c)
         spaces=""
-        ;;
-    esac
+        case $extlen in
+        3)
+            spaces="     "
+            ;;
+        4)
+            spaces="    "
+            ;;
+        5)
+            spaces="   "
+            ;;
+        6)
+            spaces="  "
+            ;;
+        7)
+            spaces=" "
+            ;;
+        *)
+            spaces=""
+            ;;
+        esac
 
-    if [[ -n "$reg" ]]; then
-        echo "$domain$spaces $reg"
+        if [[ -n "$reg" ]]; then
+            echo "$domain$spaces $reg"
+        else
+            echo "$domain$spaces *** available ***"
+        fi
     else
-        echo "$domain$spaces *** available ***"
+        case $domain in
+        *.com|*.net)
+            cat "$cache_dir/$domain"
+            rwhois="$(cat "$cache_dir/$domain" | grep "Registrar WHOIS Server:" | grep -o "[a-z0-9][a-z0-9\-\.]\+[a-z]$")"
+            rcache_dir="$cache_dir/registrar-$rwhois-cache"
+            rcache="$rcache_dir/$domain"
+            if [[ -f "$rcache" ]]; then
+                cat "$rcache"
+            fi
+            ;;
+        *)
+            cat "$cache_dir/$domain"
+            ;;
+        esac
     fi
 
 done
