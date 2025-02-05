@@ -6,13 +6,17 @@ if [[ $# -lt 1 ]]; then
 fi
 
 nocache=0
+#recursion=0
 
 domains=()
 for d in $@; do
     case $d in
-    "--no-cache")
+    "--no-cache"|"-n")
         nocache=1
         ;;
+#    "--recursion"|"-r")
+#        recursion=1
+#        ;;
     *)
         domains+=($d)
         ;;
@@ -30,8 +34,8 @@ for domain in ${domains[@]}; do
 
     # [1] is the domain name is valid?
     if [[ "$(echo "$domain" | grep -e '^[a-z0-9]\([a-z0-9\-]*[a-z0-9]\)\?\.\(com\|net\|org\|info\|biz\|us\|co.uk\|co\.kr\|ne\.kr\|or\.kr\|kr\)$')" != "$domain" ]]; then
-        echo "ERROR: domain \"$domain\" not supported" 1>&2
-        exit
+        echo "** ERROR: domain \"$domain\" not supported" 1>&2
+        continue
     fi
 
     # [2] whois lookup
@@ -40,20 +44,20 @@ for domain in ${domains[@]}; do
         case $domain in
         *.kr)
             if [[ "$(find "$cache_dir/" -name *.kr -ctime -1 | wc -l)" -gt 100 ]]; then
-                echo "$domain too many .KR lookup!" 1>&2
-                exit
+                echo "** $domain too many .KR lookup!" 1>&2
+                continue
             fi
             ;;
         *.org)
             if [[ "$(find "$cache_dir/" -name *.org -ctime -1 | wc -l)" -gt 100 ]]; then
-                echo "$domain too many .ORG lookup!" 1>&2
-                exit
+                echo "** $domain too many .ORG lookup!" 1>&2
+                continue
             fi
             ;;
         *.info)
             if [[ "$(find "$cache_dir/" -name *.org -ctime -1 | wc -l)" -gt 100 ]]; then
-                echo "$domain too many .INFO lookup!" 1>&2
-                exit
+                echo "** $domain too many .INFO lookup!" 1>&2
+                continue
             fi
             ;;
         esac
@@ -68,6 +72,19 @@ for domain in ${domains[@]}; do
             ;;
         esac
     fi
+
+    # recursion
+#    if [[ "$recursion" -ne 0 ]] && [[ -n "$(echo "$domain" | grep -o '\.\(com\|net\)$')" ]] && [[ "$nocache" -eq 0 ]]; then
+#        rwhois="$(cat "$cache_dir/$domain" | grep "Registrar WHOIS Server:" | grep -o "[a-z0-9][a-z0-9\-\.]\+[a-z]$")"
+#        rcache_dir="$cache_dir/registrar-$rwhois-cache"
+#        rcache="$rcache_dir/$domain"
+#        if [[ ! -f "$rcache" ]]; then
+#            if [[ ! -d "$rcache_dir" ]]; then
+#                mkdir -p "$rcache_dir"
+#            fi
+#            whois --host "$rwhois" "$domain" > "$rcache"
+#        fi
+#    fi
 
     # [3] show the creation date from cache
     reg=""
