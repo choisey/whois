@@ -79,49 +79,51 @@ convert_month_to_number() {
 
 for domain in ${domains[@]}; do
 
-    # [1] is the domain name is valid?
-    #if [[ "$(echo "$domain" | grep -e '^[a-z0-9]\([a-z0-9\-]*[a-z0-9]\)\?\.\(com\|net\|org\|info\|biz\|us\|co.uk\|co\.kr\|ne\.kr\|or\.kr\|kr\)$')" != "$domain" ]]; then
-    #    echo "** ERROR: domain \"$domain\" not supported" 1>&2
-    #    continue
-    #fi
+    # [1] Validate domain name format
+    # Basic format: alphanumeric characters, hyphens, and dots
+    # Must not start or end with hyphen, must have at least one dot
+    if ! [[ "$domain" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$ ]]; then
+        echo "** ERROR: Invalid domain format: \"$domain\"" 1>&2
+        continue
+    fi
 
-    # [2] whois lookup
+    # [2] Validate TLD is supported
+    # Extract TLD (handle multi-level TLDs like .ac.uk, .gov.uk)
+    tld="${domain##*.}"
+    if [[ "$domain" =~ \.(ac|gov|co)\.[^.]+$ ]]; then
+        # Multi-level TLD
+        second_level="${domain%.*}"
+        second_level="${second_level##*.}"
+        tld="$second_level.$tld"
+    fi
+
+    # Check if TLD is configured
+    if [[ -z "${WHOIS_SERVERS[$tld]}" ]]; then
+        echo "** ERROR: TLD \".$tld\" not supported for domain \"$domain\"" 1>&2
+        echo "** Supported TLDs: ${!WHOIS_SERVERS[@]}" 1>&2
+        continue
+    fi
+
+    # [3] whois lookup
     if [[ "$nocache" -ne 0 ]] || [[ ! -f "$cache_dir/$domain" ]]; then
         #
-        # rate limiting
+        # rate limiting (uses top-level domain only, e.g., "kr" not "co.kr")
         #
-        # Extract TLD from domain
-        tld="${domain##*.}"
-
-        # Check if this TLD has rate limiting
-        if [[ -n "${RATE_LIMITS[$tld]}" ]]; then
-            limit="${RATE_LIMITS[$tld]}"
-            count=$(find "$cache_dir/" -name "*.$tld" -ctime -1 2>/dev/null | wc -l)
+        rate_limit_tld="${domain##*.}"
+        if [[ -n "${RATE_LIMITS[$rate_limit_tld]}" ]]; then
+            limit="${RATE_LIMITS[$rate_limit_tld]}"
+            count=$(find "$cache_dir/" -name "*.$rate_limit_tld" -ctime -1 2>/dev/null | wc -l)
             if [[ "$count" -gt "$limit" ]]; then
-                echo "** $domain too many .$tld lookup! ($count/$limit per day)" 1>&2
+                echo "** $domain too many .$rate_limit_tld lookup! ($count/$limit per day)" 1>&2
                 continue
             fi
         fi
 
         #
-        # lookup
+        # lookup (TLD already validated and extracted above)
         #
-        # Extract TLD (handle multi-level TLDs like .ac.uk, .gov.uk)
-        tld="${domain##*.}"
-        if [[ "$domain" =~ \.(ac|gov|co)\.[^.]+$ ]]; then
-            # Multi-level TLD (e.g., .ac.uk, .gov.uk, .co.uk)
-            tld="${domain##*.}"
-            second_level="${domain%.*}"
-            second_level="${second_level##*.}"
-            tld="$second_level.$tld"
-        fi
-
         # Lookup WHOIS server for this TLD
         whois_server="${WHOIS_SERVERS[$tld]}"
-        if [[ -z "$whois_server" ]]; then
-            echo "** ERROR: domain \"$domain\" (TLD: .$tld) not supported" 1>&2
-            exit 1
-        fi
 
         # Get query prefix if any (e.g., "=" for .com/.net thick whois)
         query_prefix="${QUERY_PREFIXES[$tld]}"
@@ -168,7 +170,7 @@ for domain in ${domains[@]}; do
         fi
     fi
 
-    # [3] show from cache
+    # [4] show from cache
     if [[ "$view" -eq 0 ]]; then
         # show only the creation date
         reg=""
