@@ -38,6 +38,36 @@ if [[ ! -d $cache_dir ]]; then
     mkdir -p "$cache_dir"
 fi
 
+# Configuration: WHOIS servers by TLD
+declare -A WHOIS_SERVERS=(
+    [com]="whois.verisign-grs.com"
+    [net]="whois.verisign-grs.com"
+    [org]="whois.pir.org"
+    [info]="whois.nic.info"
+    [biz]="whois.biz"
+    [mobi]="whois.dotmobiregistry.net"
+    [edu]="whois.educause.edu"
+    [gov]="whois.nic.gov"
+    [ac.uk]="whois.ja.net"
+    [gov.uk]="whois.ja.net"
+    [us]="whois.nic.us"
+    [uk]="whois.nic.uk"
+    [kr]="whois.nic.or.kr"
+)
+
+# Configuration: Query prefixes (= prefix for thick whois)
+declare -A QUERY_PREFIXES=(
+    [com]="="
+    [net]="="
+)
+
+# Configuration: Rate limits (queries per day)
+declare -A RATE_LIMITS=(
+    [kr]=200
+    [org]=200
+    [info]=200
+)
+
 for domain in ${domains[@]}; do
 
     # [1] is the domain name is valid?
@@ -51,70 +81,44 @@ for domain in ${domains[@]}; do
         #
         # rate limiting
         #
-        case $domain in
-        *.kr)
-            if [[ "$(find "$cache_dir/" -name *.kr -ctime -1 | wc -l)" -gt 200 ]]; then
-                echo "** $domain too many .KR lookup!" 1>&2
+        # Extract TLD from domain
+        tld="${domain##*.}"
+
+        # Check if this TLD has rate limiting
+        if [[ -n "${RATE_LIMITS[$tld]}" ]]; then
+            limit="${RATE_LIMITS[$tld]}"
+            count=$(find "$cache_dir/" -name "*.$tld" -ctime -1 2>/dev/null | wc -l)
+            if [[ "$count" -gt "$limit" ]]; then
+                echo "** $domain too many .$tld lookup! ($count/$limit per day)" 1>&2
                 continue
             fi
-            ;;
-        *.org)
-            if [[ "$(find "$cache_dir/" -name *.org -ctime -1 | wc -l)" -gt 200 ]]; then
-                echo "** $domain too many .ORG lookup!" 1>&2
-                continue
-            fi
-            ;;
-        *.info)
-            if [[ "$(find "$cache_dir/" -name *.info -ctime -1 | wc -l)" -gt 200 ]]; then
-                echo "** $domain too many .INFO lookup!" 1>&2
-                continue
-            fi
-            ;;
-        esac
+        fi
 
         #
         # lookup
         #
-        case $domain in
-        *.com|*.net)
-            printf "=$domain\r\n" | nc whois.verisign-grs.com 43 > "$cache_dir/$domain"
-            ;;
-        *.org)
-            printf "$domain\r\n" | nc whois.pir.org 43 > "$cache_dir/$domain"
-            ;;
-        *.info)
-            printf "$domain\r\n" | nc whois.nic.info 43 > "$cache_dir/$domain" # whois.afilias.net ??
-            ;;
-        *.biz)
-            printf "$domain\r\n" | nc whois.biz 43 > "$cache_dir/$domain"
-            ;;
-        *.mobi)
-            printf "$domain\r\n" | nc whois.dotmobiregistry.net 43 > "$cache_dir/$domain"
-            ;;
-        *.edu)
-            printf "$domain\r\n" | nc whois.educause.edu 43 > "$cache_dir/$domain"
-            ;;
-        *.gov)
-            printf "$domain\r\n" | nc whois.nic.gov 43 > "$cache_dir/$domain"
-            ;;
-        *.ac.uk|*.gov.uk)
-            printf "$domain\r\n" | nc whois.ja.net 43 > "$cache_dir/$domain"
-            ;;
-        *.us)
-            printf "$domain\r\n" | nc whois.nic.us 43 > "$cache_dir/$domain"
-            ;;
-        *.uk)
-            printf "$domain\r\n" | nc whois.nic.uk 43 > "$cache_dir/$domain"
-            ;;
-        *.kr)
-            printf "$domain\r\n" | nc whois.nic.or.kr 43 > "$cache_dir/$domain"
-            ;;
-        *)
-            #whois $domain > "$cache_dir/$domain"
-            echo "** ERROR: domain \"$domain\" not supported" 1>&2
+        # Extract TLD (handle multi-level TLDs like .ac.uk, .gov.uk)
+        tld="${domain##*.}"
+        if [[ "$domain" =~ \.(ac|gov|co)\.[^.]+$ ]]; then
+            # Multi-level TLD (e.g., .ac.uk, .gov.uk, .co.uk)
+            tld="${domain##*.}"
+            second_level="${domain%.*}"
+            second_level="${second_level##*.}"
+            tld="$second_level.$tld"
+        fi
+
+        # Lookup WHOIS server for this TLD
+        whois_server="${WHOIS_SERVERS[$tld]}"
+        if [[ -z "$whois_server" ]]; then
+            echo "** ERROR: domain \"$domain\" (TLD: .$tld) not supported" 1>&2
             exit 1
-            ;;
-        esac
+        fi
+
+        # Get query prefix if any (e.g., "=" for .com/.net thick whois)
+        query_prefix="${QUERY_PREFIXES[$tld]}"
+
+        # Perform lookup
+        printf "${query_prefix}$domain\r\n" | nc "$whois_server" 43 > "$cache_dir/$domain"
     fi
 
     # recursion
