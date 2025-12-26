@@ -65,7 +65,7 @@ for domain in ${domains[@]}; do
             fi
             ;;
         *.info)
-            if [[ "$(find "$cache_dir/" -name *.org -ctime -1 | wc -l)" -gt 200 ]]; then
+            if [[ "$(find "$cache_dir/" -name *.info -ctime -1 | wc -l)" -gt 200 ]]; then
                 echo "** $domain too many .INFO lookup!" 1>&2
                 continue
             fi
