@@ -1,12 +1,36 @@
 #!/bin/bash
 
+show_help() {
+    cat << EOF
+Usage: $0 [options] <domain-name> [<domain-name> ...]
+
+Query WHOIS information for domain names with caching support.
+
+Options:
+    -f, --force-refresh   Force a new lookup bypassing cached data
+    -r, --registrar       Query registrar's whois server (.com and .net)
+    -s, --summary         Show only registration and expiry dates (brief output)
+    -h, --help            Display this help message and exit
+
+Examples:
+    $0 example.com                    # Show full WHOIS data
+    $0 -s example.com example.org     # Show summary for multiple domains
+    $0 -f -r example.com              # Force refresh and query registrar
+
+Default behavior:
+    - Uses cached data when available
+    - Shows full WHOIS output (use -s for summary)
+    - Queries registry server only (use -r for registrar)
+
+Supported TLDs:
+    .com, .net, .org, .info, .biz, .us, .uk, .gov, .edu, .kr, .mobi
+    .ac.uk, .gov.uk (multi-level TLDs)
+EOF
+    exit 0
+}
+
 if [[ $# -lt 1 ]]; then
-    echo "Usage: $0 [options]? [domain-name]" 1>&2
-    echo "Options:" 1>&2
-    echo -e "\t--force-refresh (-f)  Force a new lookup bypassing cached data" 1>&2
-    echo -e "\t--registrar (-r)      Query registrar's whois server (.com and .net)" 1>&2
-    echo -e "\t--summary (-s)        Show only registration and expiry dates (brief output)" 1>&2
-    exit
+    show_help
 fi
 
 force_refresh=0
@@ -16,6 +40,9 @@ summary=0
 domains=()
 for d in "$@"; do
     case $d in
+    "--help"|"-h")
+        show_help
+        ;;
     "--force-refresh"|"-f")
         force_refresh=1
         ;;
