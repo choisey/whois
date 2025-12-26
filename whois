@@ -14,7 +14,7 @@ recursion=0
 view=0
 
 domains=()
-for d in $@; do
+for d in "$@"; do
     case $d in
     "--no-cache"|"-n")
         nocache=1
@@ -26,15 +26,15 @@ for d in $@; do
         view=1
         ;;
     *)
-        domains+=($d)
+        domains+=("$d")
         ;;
     esac
 done
 
-dir=$(dirname $0)
+dir=$(dirname "$0")
 cache_dir="$dir/whois-cache"
 
-if [[ ! -d $cache_dir ]]; then
+if [[ ! -d "$cache_dir" ]]; then
     mkdir -p "$cache_dir"
 fi
 
@@ -144,11 +144,10 @@ for domain in ${domains[@]}; do
     # recursion
     # must be either .com or .net
     if [[ "$recursion" -ne 0 ]] && [[ -n "$(echo "$domain" | grep -o '\.\(com\|net\)$')" ]]; then
-        #rwhois="$(cat "$cache_dir/$domain" | grep "Registrar WHOIS Server:" | grep -o "[a-z0-9][a-z0-9\-\.]\+[a-z]$")"
-        rwhois="$(cat "$cache_dir/$domain" \
-            | grep "Registrar WHOIS Server:" \
-            | sed -e 's/^[[:space:]]*Registrar\ WHOIS\ Server:[[:space:]]*//' -e 's/[\r\n]\+//' \
-            | tr -d '\n')"
+        #rwhois="$(grep "Registrar WHOIS Server:" "$cache_dir/$domain" | grep -o "[a-z0-9][a-z0-9\-\.]\+[a-z]$")"
+        rwhois="$(grep "Registrar WHOIS Server:" "$cache_dir/$domain" \
+            | sed -e 's/^[[:space:]]*Registrar WHOIS Server:[[:space:]]*//' -e 's/[[:space:]]*$//' \
+            | tr -d '\r\n')"
         rcache_dir="$cache_dir/registrar-$rwhois-cache"
         rcache="$rcache_dir/$domain"
         if [[ "$nocache" -ne 0 ]] || [[ ! -f "$rcache" ]]; then
@@ -176,38 +175,38 @@ for domain in ${domains[@]}; do
         exp=""
         case $domain in
         *.com|*.net)
-            reg="$(cat "$cache_dir/$domain" | grep 'Creation Date:' | sed 's/^Creation\ Date:\ //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+")"
-            exp="$(cat "$cache_dir/$domain" | grep 'Registry Expiry Date:' | sed 's/^Registry Expiry Date:\ //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+")"
+            reg="$(grep 'Creation Date:' "$cache_dir/$domain" | sed 's/^Creation Date: //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+")"
+            exp="$(grep 'Registry Expiry Date:' "$cache_dir/$domain" | sed 's/^Registry Expiry Date: //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+")"
             ;;
         *.org|*.info|*.biz|*.us|*.gov)
-            reg="$(cat "$cache_dir/$domain" | grep 'Creation Date:' | sed 's/^Creation\ Date:\ //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+" | head -1)"
-            exp="$(cat "$cache_dir/$domain" | grep 'Registry Expiry Date:' | sed 's/^Registry Expiry Date:\ //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+" | head -1)"
+            reg="$(grep 'Creation Date:' "$cache_dir/$domain" | sed 's/^Creation Date: //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+" | head -1)"
+            exp="$(grep 'Registry Expiry Date:' "$cache_dir/$domain" | sed 's/^Registry Expiry Date: //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+" | head -1)"
             ;;
         *.edu)
-            reg="$(cat "$cache_dir/$domain" | grep 'Domain record activated:' | sed -e "s/^.\+\([0-9]\{2\}\)-\([A-Z][a-z]\{2\}\)-\([0-9]\{4\}\)/\3-\2-\1/")"
+            reg="$(grep 'Domain record activated:' "$cache_dir/$domain" | sed 's/.*\([0-9]\{2\}\)-\([A-Z][a-z]\{2\}\)-\([0-9]\{4\}\).*/\3-\2-\1/')"
             reg="$(convert_month_to_number "$reg")"
-            exp="$(cat "$cache_dir/$domain" | grep 'Domain expires:' | sed -e "s/^.\+\([0-9]\{2\}\)-\([A-Z][a-z]\{2\}\)-\([0-9]\{4\}\)/\3-\2-\1/")"
+            exp="$(grep 'Domain expires:' "$cache_dir/$domain" | sed 's/.*\([0-9]\{2\}\)-\([A-Z][a-z]\{2\}\)-\([0-9]\{4\}\).*/\3-\2-\1/')"
             exp="$(convert_month_to_number "$exp")"
             ;;
         *.ac.uk|*.gov.uk)
-            reg="$(cat "$cache_dir/$domain" | sed -n '/Entry created:/,//p' | sed -n '2,2p' | sed -e 's/^[[:space:]]\+//' | sed 's/\([0-9]\+\)\(st\|nd\|rd\|th\)/\1/')"
-            reg="$(date -d "$(echo "$reg" | sed 's/\([0-9]\+\)\(st\|nd\|rd\|th\)/\1/')" +"%Y-%m-%d")"
-            exp="$(cat "$cache_dir/$domain" | sed -n '/Renewal date:/,//p' | sed -n '2,2p' | sed -e 's/^[[:space:]]\+//' | sed 's/\([0-9]\+\)\(st\|nd\|rd\|th\)/\1/')"
-            exp="$(date -d "$(echo "$exp" | sed 's/\([0-9]\+\)\(st\|nd\|rd\|th\)/\1/')" +"%Y-%m-%d")"
+            reg="$(sed -n '/Entry created:/,//p' "$cache_dir/$domain" | sed -n '2p' | sed -e 's/^[[:space:]]\+//' -e 's/\(st\|nd\|rd\|th\)//g')"
+            reg="$(date -d "$reg" +"%Y-%m-%d")"
+            exp="$(sed -n '/Renewal date:/,//p' "$cache_dir/$domain" | sed -n '2p' | sed -e 's/^[[:space:]]\+//' -e 's/\(st\|nd\|rd\|th\)//g')"
+            exp="$(date -d "$exp" +"%Y-%m-%d")"
             ;;
         *.uk)
-            reg="$(cat "$cache_dir/$domain" | grep 'Registered on:' | sed -e "s/^.\+\ before Aug-1996/before 08-1996/" \
-                -e "s/^.\+\([0-9]\{2\}\)-\([A-Z][a-z]\{2\}\)-\([0-9]\{4\}\)/\3-\2-\1/" \
-                -e 's/[\r\n]\+$//')"
+            reg="$(grep 'Registered on:' "$cache_dir/$domain" | sed -e 's/.* before Aug-1996/before 08-1996/' \
+                -e 's/.*\([0-9]\{2\}\)-\([A-Z][a-z]\{2\}\)-\([0-9]\{4\}\).*/\3-\2-\1/' \
+                -e 's/[[:space:]]*$//')"
             reg="$(convert_month_to_number "$reg")"
-            exp="$(cat "$cache_dir/$domain" | grep 'Expiry date:' | sed \
-                -e "s/^.\+\([0-9]\{2\}\)-\([A-Z][a-z]\{2\}\)-\([0-9]\{4\}\)/\3-\2-\1/" \
-                -e 's/[\r\n]\+$//')"
+            exp="$(grep 'Expiry date:' "$cache_dir/$domain" | sed \
+                -e 's/.*\([0-9]\{2\}\)-\([A-Z][a-z]\{2\}\)-\([0-9]\{4\}\).*/\3-\2-\1/' \
+                -e 's/[[:space:]]*$//')"
             exp="$(convert_month_to_number "$exp")"
             ;;
         *.kr)
-            reg="$(cat "$cache_dir/$domain" | grep 'Registered Date' | sed "s/^.\+\([0-9]\{4\}\)\.\ \([0-9]\{2\}\)\.\ \([0-9]\{2\}\)\./\1-\2-\3/")"
-            exp="$(cat "$cache_dir/$domain" | grep 'Expiration Date' | sed "s/^.\+\([0-9]\{4\}\)\.\ \([0-9]\{2\}\)\.\ \([0-9]\{2\}\)\./\1-\2-\3/")"
+            reg="$(grep 'Registered Date' "$cache_dir/$domain" | sed 's/.*\([0-9]\{4\}\)\. \([0-9]\{2\}\)\. \([0-9]\{2\}\)\./\1-\2-\3/')"
+            exp="$(grep 'Expiration Date' "$cache_dir/$domain" | sed 's/.*\([0-9]\{4\}\)\. \([0-9]\{2\}\)\. \([0-9]\{2\}\)\./\1-\2-\3/')"
             ;;
         *)
             reg="$(cat "$cache_dir/$domain")"
@@ -246,11 +245,10 @@ for domain in ${domains[@]}; do
         case $domain in
         *.com|*.net)
             cat "$cache_dir/$domain"
-            #rwhois="$(cat "$cache_dir/$domain" | grep "Registrar WHOIS Server:" | grep -o "[a-z0-9][a-z0-9\-\.]\+[a-z]$")"
-            rwhois="$(cat "$cache_dir/$domain" \
-                | grep "Registrar WHOIS Server:" \
-                | sed -e 's/^[[:space:]]*Registrar\ WHOIS\ Server:[[:space:]]*//' -e 's/[\r\n]\+//' \
-                | tr -d '\n')"
+            #rwhois="$(grep "Registrar WHOIS Server:" "$cache_dir/$domain" | grep -o "[a-z0-9][a-z0-9\-\.]\+[a-z]$")"
+            rwhois="$(grep "Registrar WHOIS Server:" "$cache_dir/$domain" \
+                | sed -e 's/^[[:space:]]*Registrar WHOIS Server:[[:space:]]*//' -e 's/[[:space:]]*$//' \
+                | tr -d '\r\n')"
             rcache_dir="$cache_dir/registrar-$rwhois-cache"
             rcache="$rcache_dir/$domain"
             if [[ -f "$rcache" ]]; then
