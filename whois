@@ -118,7 +118,18 @@ for domain in ${domains[@]}; do
         query_prefix="${QUERY_PREFIXES[$tld]}"
 
         # Perform lookup
-        printf "${query_prefix}$domain\r\n" | nc "$whois_server" 43 > "$cache_dir/$domain"
+        if ! printf "${query_prefix}$domain\r\n" | nc "$whois_server" 43 > "$cache_dir/$domain"; then
+            echo "** ERROR: Lookup failed for $domain (server: $whois_server)" 1>&2
+            rm -f "$cache_dir/$domain"
+            continue
+        fi
+
+        # Check if response is not empty
+        if [[ ! -s "$cache_dir/$domain" ]]; then
+            echo "** ERROR: Empty response for $domain (server: $whois_server)" 1>&2
+            rm -f "$cache_dir/$domain"
+            continue
+        fi
     fi
 
     # recursion
@@ -132,10 +143,20 @@ for domain in ${domains[@]}; do
         rcache_dir="$cache_dir/registrar-$rwhois-cache"
         rcache="$rcache_dir/$domain"
         if [[ "$nocache" -ne 0 ]] || [[ ! -f "$rcache" ]]; then
-            if [[ ! -d "$rcache_dir" ]]; then
-                mkdir -p "$rcache_dir"
+            if [[ -z "$rwhois" ]]; then
+                echo "** WARNING: No registrar WHOIS server found for $domain" 1>&2
+            else
+                if [[ ! -d "$rcache_dir" ]]; then
+                    mkdir -p "$rcache_dir"
+                fi
+                if ! printf "$domain\r\n" | nc "$rwhois" 43 > "$rcache"; then
+                    echo "** WARNING: Recursive lookup failed for $domain (server: $rwhois)" 1>&2
+                    rm -f "$rcache"
+                elif [[ ! -s "$rcache" ]]; then
+                    echo "** WARNING: Empty recursive response for $domain (server: $rwhois)" 1>&2
+                    rm -f "$rcache"
+                fi
             fi
-            printf "$domain\r\n" | nc "$rwhois" 43 > "$rcache"
         fi
     fi
 
