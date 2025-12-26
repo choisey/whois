@@ -15,7 +15,7 @@ Options:
 Examples:
     $0 example.com                    # Show full WHOIS data
     $0 -s example.com example.org     # Show summary for multiple domains
-    $0 -f -r example.com              # Force refresh and query registrar
+    $0 -frs example.com               # Combine flags: force refresh, registrar, summary
 
 Default behavior:
     - Uses cached data when available
@@ -33,30 +33,50 @@ if [[ $# -lt 1 ]]; then
     show_help
 fi
 
+# Convert long options to short options
+args=()
+for arg in "$@"; do
+    case "$arg" in
+        --force-refresh) args+=("-f") ;;
+        --registrar)     args+=("-r") ;;
+        --summary)       args+=("-s") ;;
+        --help)          args+=("-h") ;;
+        *)               args+=("$arg") ;;
+    esac
+done
+set -- "${args[@]}"
+
+# Parse options using getopts
 force_refresh=0
 registrar=0
 summary=0
 
-domains=()
-for d in "$@"; do
-    case $d in
-    "--help"|"-h")
-        show_help
-        ;;
-    "--force-refresh"|"-f")
-        force_refresh=1
-        ;;
-    "--registrar"|"-r")
-        registrar=1
-        ;;
-    "--summary"|"-s")
-        summary=1
-        ;;
-    *)
-        domains+=("$d")
-        ;;
+while getopts "frsh" opt; do
+    case $opt in
+        f)
+            force_refresh=1
+            ;;
+        r)
+            registrar=1
+            ;;
+        s)
+            summary=1
+            ;;
+        h)
+            show_help
+            ;;
+        \?)
+            echo "Invalid option: -$OPTARG" >&2
+            show_help
+            ;;
     esac
 done
+
+# Shift past the options to get domain names
+shift $((OPTIND - 1))
+
+# Collect domain names
+domains=("$@")
 
 dir=$(dirname "$0")
 cache_dir="$dir/whois-cache"
