@@ -3,15 +3,15 @@
 if [[ $# -lt 1 ]]; then
     echo "Usage: $0 [options]? [domain-name]" 1>&2
     echo "Options:" 1>&2
-    echo -e "\t--no-cache (-n)  Enforce a lookup bypassing cached data" 1>&2
-    echo -e "\t--recursion (-r) Recursive query to registrar's whois server (.com and .net)" 1>&2
-    echo -e "\t--view (-v)      View the lookup result" 1>&2
+    echo -e "\t--no-cache (-n)   Enforce a lookup bypassing cached data" 1>&2
+    echo -e "\t--recursion (-r)  Recursive query to registrar's whois server (.com and .net)" 1>&2
+    echo -e "\t--summary (-s)    Show only registration and expiry dates (brief output)" 1>&2
     exit
 fi
 
 nocache=0
 recursion=0
-view=0
+summary=0
 
 domains=()
 for d in "$@"; do
@@ -22,8 +22,8 @@ for d in "$@"; do
     "--recursion"|"-r")
         recursion=1
         ;;
-    "--view"|"-v")
-        view=1
+    "--summary"|"-s")
+        summary=1
         ;;
     *)
         domains+=("$d")
@@ -171,8 +171,8 @@ for domain in ${domains[@]}; do
     fi
 
     # [4] show from cache
-    if [[ "$view" -eq 0 ]]; then
-        # show only the creation date
+    if [[ "$summary" -eq 1 ]]; then
+        # Summary mode: show only registration and expiry dates
         reg=""
         exp=""
         case $domain in
@@ -244,6 +244,7 @@ for domain in ${domains[@]}; do
             echo "$domain$spaces *** available ***"
         fi
     else
+        # Full output mode (default): show complete WHOIS data
         case $domain in
         *.com|*.net)
             cat "$cache_dir/$domain"
