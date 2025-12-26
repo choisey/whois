@@ -3,24 +3,24 @@
 if [[ $# -lt 1 ]]; then
     echo "Usage: $0 [options]? [domain-name]" 1>&2
     echo "Options:" 1>&2
-    echo -e "\t--no-cache (-n)   Enforce a lookup bypassing cached data" 1>&2
-    echo -e "\t--recursion (-r)  Recursive query to registrar's whois server (.com and .net)" 1>&2
-    echo -e "\t--summary (-s)    Show only registration and expiry dates (brief output)" 1>&2
+    echo -e "\t--force-refresh (-f)  Force a new lookup bypassing cached data" 1>&2
+    echo -e "\t--registrar (-r)      Query registrar's whois server (.com and .net)" 1>&2
+    echo -e "\t--summary (-s)        Show only registration and expiry dates (brief output)" 1>&2
     exit
 fi
 
-nocache=0
-recursion=0
+force_refresh=0
+registrar=0
 summary=0
 
 domains=()
 for d in "$@"; do
     case $d in
-    "--no-cache"|"-n")
-        nocache=1
+    "--force-refresh"|"-f")
+        force_refresh=1
         ;;
-    "--recursion"|"-r")
-        recursion=1
+    "--registrar"|"-r")
+        registrar=1
         ;;
     "--summary"|"-s")
         summary=1
@@ -105,7 +105,7 @@ for domain in ${domains[@]}; do
     fi
 
     # [3] whois lookup
-    if [[ "$nocache" -ne 0 ]] || [[ ! -f "$cache_dir/$domain" ]]; then
+    if [[ "$force_refresh" -ne 0 ]] || [[ ! -f "$cache_dir/$domain" ]]; then
         #
         # rate limiting (uses top-level domain only, e.g., "kr" not "co.kr")
         #
@@ -143,16 +143,16 @@ for domain in ${domains[@]}; do
         fi
     fi
 
-    # recursion
+    # registrar lookup
     # must be either .com or .net
-    if [[ "$recursion" -ne 0 ]] && [[ -n "$(echo "$domain" | grep -o '\.\(com\|net\)$')" ]]; then
+    if [[ "$registrar" -ne 0 ]] && [[ -n "$(echo "$domain" | grep -o '\.\(com\|net\)$')" ]]; then
         #rwhois="$(grep "Registrar WHOIS Server:" "$cache_dir/$domain" | grep -o "[a-z0-9][a-z0-9\-\.]\+[a-z]$")"
         rwhois="$(grep "Registrar WHOIS Server:" "$cache_dir/$domain" \
             | sed -e 's/^[[:space:]]*Registrar WHOIS Server:[[:space:]]*//' -e 's/[[:space:]]*$//' \
             | tr -d '\r\n')"
         rcache_dir="$cache_dir/registrar-$rwhois-cache"
         rcache="$rcache_dir/$domain"
-        if [[ "$nocache" -ne 0 ]] || [[ ! -f "$rcache" ]]; then
+        if [[ "$force_refresh" -ne 0 ]] || [[ ! -f "$rcache" ]]; then
             if [[ -z "$rwhois" ]]; then
                 echo "** WARNING: No registrar WHOIS server found for $domain" 1>&2
             else
