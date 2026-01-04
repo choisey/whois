@@ -24,7 +24,7 @@ Default behavior:
 
 Supported TLDs:
     .com, .net, .org, .info, .biz, .us, .uk, .gov, .edu, .kr, .mobi
-    .ac.uk, .gov.uk (multi-level TLDs)
+    .ac.uk, .gov.uk, .co.kr, .or.kr, .ne.kr, .pe.kr, .go.kr, .re.kr, etc. (multi-level TLDs)
 EOF
     exit 0
 }
@@ -100,6 +100,19 @@ declare -A WHOIS_SERVERS=(
     [us]="whois.nic.us"
     [uk]="whois.nic.uk"
     [kr]="whois.nic.or.kr"
+    [co.kr]="whois.nic.or.kr"
+    [or.kr]="whois.nic.or.kr"
+    [ne.kr]="whois.nic.or.kr"
+    [pe.kr]="whois.nic.or.kr"
+    [go.kr]="whois.nic.or.kr"
+    [re.kr]="whois.nic.or.kr"
+    [ac.kr]="whois.nic.or.kr"
+    [hs.kr]="whois.nic.or.kr"
+    [ms.kr]="whois.nic.or.kr"
+    [es.kr]="whois.nic.or.kr"
+    [sc.kr]="whois.nic.or.kr"
+    [kg.kr]="whois.nic.or.kr"
+    [mil.kr]="whois.nic.or.kr"
 )
 
 # Configuration: Query prefixes (= prefix for thick whois)
@@ -135,9 +148,9 @@ for domain in ${domains[@]}; do
     fi
 
     # [2] Validate TLD is supported
-    # Extract TLD (handle multi-level TLDs like .ac.uk, .gov.uk)
+    # Extract TLD (handle multi-level TLDs like .ac.uk, .gov.uk, .co.kr, etc.)
     tld="${domain##*.}"
-    if [[ "$domain" =~ \.(ac|gov|co)\.[^.]+$ ]]; then
+    if [[ "$domain" =~ \.(ac|gov|co|or|ne|pe|go|re|hs|ms|es|sc|kg|mil)\.[^.]+$ ]]; then
         # Multi-level TLD
         second_level="${domain%.*}"
         second_level="${second_level##*.}"
@@ -253,7 +266,7 @@ for domain in ${domains[@]}; do
                 -e 's/[[:space:]]*$//')"
             exp="$(convert_month_to_number "$exp")"
             ;;
-        *.kr)
+        *.kr|*.co.kr|*.or.kr|*.ne.kr|*.pe.kr|*.go.kr|*.re.kr|*.ac.kr|*.hs.kr|*.ms.kr|*.es.kr|*.sc.kr|*.kg.kr|*.mil.kr)
             reg="$(grep 'Registered Date' "$cache_dir/$domain" | sed 's/.*\([0-9]\{4\}\)\. \([0-9]\{2\}\)\. \([0-9]\{2\}\)\./\1-\2-\3/')"
             exp="$(grep 'Expiration Date' "$cache_dir/$domain" | sed 's/.*\([0-9]\{4\}\)\. \([0-9]\{2\}\)\. \([0-9]\{2\}\)\./\1-\2-\3/')"
             ;;
