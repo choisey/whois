@@ -249,9 +249,9 @@ for domain in ${domains[@]}; do
             exp="$(convert_month_to_number "$exp")"
             ;;
         *.ac.uk|*.gov.uk)
-            reg="$(sed -n '/Entry created:/,//p' "$cache_dir/$domain" | sed -n '2p' | sed -e 's/^[[:space:]]\+//' -e 's/\(st\|nd\|rd\|th\)//g')"
+            reg="$(sed -n '/Entry created:/,//p' "$cache_dir/$domain" | sed -n '2p' | sed -e 's/^[[:space:]]\+//' -e 's/\([0-9]\)\(st\|nd\|rd\|th\)/\1/g')"
             reg="$(date -d "$reg" +"%Y-%m-%d")"
-            exp="$(sed -n '/Renewal date:/,//p' "$cache_dir/$domain" | sed -n '2p' | sed -e 's/^[[:space:]]\+//' -e 's/\(st\|nd\|rd\|th\)//g')"
+            exp="$(sed -n '/Renewal date:/,//p' "$cache_dir/$domain" | sed -n '2p' | sed -e 's/^[[:space:]]\+//' -e 's/\([0-9]\)\(st\|nd\|rd\|th\)/\1/g')"
             exp="$(date -d "$exp" +"%Y-%m-%d")"
             ;;
         *.uk)
