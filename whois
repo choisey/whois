@@ -23,7 +23,7 @@ Default behavior:
     - Queries registry server only (use -r for registrar)
 
 Supported TLDs:
-    .com, .net, .org, .biz, .us, .uk, .gov, .edu, .kr, .mobi
+    .com, .net, .org, .biz, .us, .uk, .gov, .edu, .kr, .mobi, .tv, .ai, .io, .ws, .bz
     .ac.uk, .gov.uk, .co.kr, .or.kr, .ne.kr, .pe.kr, .go.kr, .re.kr, etc. (multi-level TLDs)
 EOF
     exit 0
@@ -98,6 +98,11 @@ declare -A WHOIS_SERVERS=(
     [gov.uk]="whois.ja.net"
     [us]="whois.nic.us"
     [uk]="whois.nic.uk"
+    [tv]="whois.nic.tv"
+    [ai]="whois.nic.ai"
+    [io]="whois.nic.io"
+    [ws]="whois.website.ws"
+    [bz]="whois.afilias-grs.info"
     [kr]="whois.nic.or.kr"
     [co.kr]="whois.nic.or.kr"
     [or.kr]="whois.nic.or.kr"
@@ -238,7 +243,7 @@ for domain in ${domains[@]}; do
             reg="$(grep 'Creation Date:' "$cache_dir/$domain" | sed 's/^Creation Date: //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+")"
             exp="$(grep 'Registry Expiry Date:' "$cache_dir/$domain" | sed 's/^Registry Expiry Date: //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+")"
             ;;
-        *.org|*.biz|*.us|*.gov)
+        *.org|*.biz|*.us|*.gov|*.tv|*.ai|*.io|*.ws|*.bz)
             reg="$(grep 'Creation Date:' "$cache_dir/$domain" | sed 's/^Creation Date: //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+" | head -1)"
             exp="$(grep 'Registry Expiry Date:' "$cache_dir/$domain" | sed 's/^Registry Expiry Date: //' | grep -o "[0-9]\+-[0-9]\+-[0-9]\+" | head -1)"
             ;;
