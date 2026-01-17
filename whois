@@ -66,7 +66,8 @@ while getopts "frsh" opt; do
             show_help
             ;;
         \?)
-            echo "Invalid option: -$OPTARG" >&2
+            echo "ERROR: Invalid option '-$OPTARG'" >&2
+            echo "" >&2
             show_help
             ;;
     esac
@@ -145,7 +146,7 @@ for domain in ${domains[@]}; do
     # Check if domain has no TLD (no dot in the name)
     if [[ ! "$domain" =~ \. ]]; then
         # Word with no TLD - query .com, .net, .org, .us with -s option
-        echo "No TLD detected for \"$domain\". Querying .com, .net, .org, .us with summary mode:"
+        echo "Info: No TLD detected for '$domain' - querying .com, .net, .org, and .us"
         echo ""
         for tld in com net org us; do
             "$0" -s "$domain.$tld"
@@ -157,7 +158,8 @@ for domain in ${domains[@]}; do
     # Basic format: alphanumeric characters, hyphens, and dots
     # Must not start or end with hyphen, must have at least one dot
     if ! [[ "$domain" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$ ]]; then
-        echo "** ERROR: Invalid domain format: \"$domain\"" 1>&2
+        echo "ERROR: Invalid domain name format: '$domain'" >&2
+        echo "       Domain names must contain only alphanumeric characters, hyphens, and dots." >&2
         continue
     fi
 
@@ -173,8 +175,9 @@ for domain in ${domains[@]}; do
 
     # Check if TLD is configured
     if [[ -z "${WHOIS_SERVERS[$tld]}" ]]; then
-        echo "** ERROR: TLD \".$tld\" not supported for domain \"$domain\"" 1>&2
-        echo "** Supported TLDs: ${!WHOIS_SERVERS[@]}" 1>&2
+        echo "ERROR: Unsupported TLD '.$tld' for domain '$domain'" >&2
+        echo "       Supported TLDs: .com, .net, .org, .biz, .us, .uk, .gov, .edu, .kr, .mobi, .tv, .ai, .io, .ws, .bz" >&2
+        echo "       Multi-level TLDs: .ac.uk, .gov.uk, .co.kr, .or.kr, .ne.kr, .pe.kr, .go.kr, .re.kr, etc." >&2
         continue
     fi
 
@@ -188,7 +191,9 @@ for domain in ${domains[@]}; do
             limit="${RATE_LIMITS[$rate_limit_tld]}"
             count=$(find "$cache_dir/" -name "*.$rate_limit_tld" -ctime -1 2>/dev/null | wc -l)
             if [[ "$count" -gt "$limit" ]]; then
-                echo "** $domain too many .$rate_limit_tld lookup! ($count/$limit per day)" 1>&2
+                echo "ERROR: Rate limit exceeded for '.$rate_limit_tld' domains" >&2
+                echo "       Current usage: $count/$limit queries per day" >&2
+                echo "       Domain '$domain' skipped to prevent blocking" >&2
                 continue
             fi
         fi
@@ -204,14 +209,18 @@ for domain in ${domains[@]}; do
 
         # Perform lookup
         if ! printf "${query_prefix}$domain\r\n" | nc "$whois_server" 43 > "$cache_dir/$domain"; then
-            echo "** ERROR: Lookup failed for $domain (server: $whois_server)" 1>&2
+            echo "ERROR: WHOIS lookup failed for '$domain'" >&2
+            echo "       Server: $whois_server" >&2
+            echo "       Please check your network connection and try again" >&2
             rm -f "$cache_dir/$domain"
             continue
         fi
 
         # Check if response is not empty
         if [[ ! -s "$cache_dir/$domain" ]]; then
-            echo "** ERROR: Empty response for $domain (server: $whois_server)" 1>&2
+            echo "ERROR: Empty response received for '$domain'" >&2
+            echo "       Server: $whois_server" >&2
+            echo "       The domain may not exist or the server may be unavailable" >&2
             rm -f "$cache_dir/$domain"
             continue
         fi
@@ -228,16 +237,21 @@ for domain in ${domains[@]}; do
         rcache="$rcache_dir/$domain"
         if [[ "$force_refresh" -ne 0 ]] || [[ ! -f "$rcache" ]]; then
             if [[ -z "$rwhois" ]]; then
-                echo "** WARNING: No registrar WHOIS server found for $domain" 1>&2
+                echo "WARNING: No registrar WHOIS server found for '$domain'" >&2
+                echo "         Registry data only - use default query for more information" >&2
             else
                 if [[ ! -d "$rcache_dir" ]]; then
                     mkdir -p "$rcache_dir"
                 fi
                 if ! printf "$domain\r\n" | nc "$rwhois" 43 > "$rcache"; then
-                    echo "** WARNING: Recursive lookup failed for $domain (server: $rwhois)" 1>&2
+                    echo "WARNING: Registrar lookup failed for '$domain'" >&2
+                    echo "         Server: $rwhois" >&2
+                    echo "         Continuing with registry data only" >&2
                     rm -f "$rcache"
                 elif [[ ! -s "$rcache" ]]; then
-                    echo "** WARNING: Empty recursive response for $domain (server: $rwhois)" 1>&2
+                    echo "WARNING: Empty registrar response for '$domain'" >&2
+                    echo "         Server: $rwhois" >&2
+                    echo "         Continuing with registry data only" >&2
                     rm -f "$rcache"
                 fi
             fi
