@@ -142,6 +142,17 @@ convert_month_to_number() {
 
 for domain in ${domains[@]}; do
 
+    # Check if domain has no TLD (no dot in the name)
+    if [[ ! "$domain" =~ \. ]]; then
+        # Word with no TLD - query .com, .net, .org, .us with -s option
+        echo "No TLD detected for \"$domain\". Querying .com, .net, .org, .us with summary mode:"
+        echo ""
+        for tld in com net org us; do
+            "$0" -s "$domain.$tld"
+        done
+        continue
+    fi
+
     # [1] Validate domain name format
     # Basic format: alphanumeric characters, hyphens, and dots
     # Must not start or end with hyphen, must have at least one dot
